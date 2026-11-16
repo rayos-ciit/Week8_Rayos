@@ -7,6 +7,7 @@ public class PlayerMovement : MonoBehaviour
     [SerializeField] private float _moveSpeed = 6f;
     [SerializeField] private float _jumpForce = 12f;
     [SerializeField] private float _gravity = 28f;
+    [SerializeField] private float _maxFallSpeed = 20f;
 
     [Header("Dependencies")]
     [SerializeField] private PlayerInput _playerInput;
@@ -15,6 +16,7 @@ public class PlayerMovement : MonoBehaviour
     #region Private Variables
     private float _verticalVelocity;
     private bool _isGrounded;
+    private bool _jumpBuffered;
     #endregion
 
     #region Properties
@@ -25,8 +27,28 @@ public class PlayerMovement : MonoBehaviour
     #region Unity Lifecycle
     private void Update()
     {
+        BufferJumpInput();
+    }
+
+    private void FixedUpdate()
+    {
         ProcessHorizontalMovement();
         ProcessVerticalMovement();
+
+        _isGrounded = false;
+    }
+    #endregion
+
+    #region Input Buffer
+    private void BufferJumpInput()
+    {
+        if (_playerInput == null) return;
+
+        if (_playerInput.JumpRequested)
+        {
+            _jumpBuffered = true;
+            _playerInput.ConsumeJump();
+        }
     }
     #endregion
 
@@ -36,7 +58,7 @@ public class PlayerMovement : MonoBehaviour
         if (_playerInput == null) return;
 
         float horizontalInput = _playerInput.HorizontalInput;
-        Vector3 horizontalDelta = new Vector3(horizontalInput * _moveSpeed * Time.deltaTime, 0f, 0f);
+        Vector3 horizontalDelta = new Vector3(horizontalInput * _moveSpeed * Time.fixedDeltaTime, 0f, 0f);
 
         transform.position += horizontalDelta;
     }
@@ -46,33 +68,27 @@ public class PlayerMovement : MonoBehaviour
         ApplyJump();
         ApplyGravity();
 
-        Vector3 verticalDelta = new Vector3(0f, _verticalVelocity * Time.deltaTime, 0f);
+        Vector3 verticalDelta = new Vector3(0f, _verticalVelocity * Time.fixedDeltaTime, 0f);
         transform.position += verticalDelta;
-
-        //reset grounded check before collision checks
-        _isGrounded = false;
     }
 
     private void ApplyJump()
     {
-        //jump only if grounded and if input has been confirmed
-        if (!_isGrounded) return;
-        if (_playerInput == null || !_playerInput.JumpRequested) return;
+        if (!_isGrounded || !_jumpBuffered) return;
 
         _verticalVelocity = _jumpForce;
         _isGrounded = false;
-        _playerInput.ConsumeJump();
+        _jumpBuffered = false;
     }
 
     private void ApplyGravity()
     {
-        if (_isGrounded && _verticalVelocity < 0f)
-        {
-            _verticalVelocity = 0f;
-            return;
-        }
+        _verticalVelocity -= _gravity * Time.fixedDeltaTime;
 
-        _verticalVelocity -= _gravity * Time.deltaTime;
+        if (_verticalVelocity < -_maxFallSpeed)
+        {
+            _verticalVelocity = -_maxFallSpeed;
+        }
     }
     #endregion
 
@@ -80,6 +96,7 @@ public class PlayerMovement : MonoBehaviour
     public void SetGrounded(bool grounded)
     {
         _isGrounded = grounded;
+
         if (_isGrounded && _verticalVelocity < 0f)
         {
             _verticalVelocity = 0f;

@@ -49,8 +49,22 @@ public class PlayerCollisionHandler : MonoBehaviour
 
     #region Resolution Logic
     private void ResolveGroundCollision(AABBCollider ground)
+{
+    float overlapX = Mathf.Min(_playerCollider.Max.x, ground.Max.x) - Mathf.Max(_playerCollider.Min.x, ground.Min.x);
+    float overlapY = Mathf.Min(_playerCollider.Max.y, ground.Max.y) - Mathf.Max(_playerCollider.Min.y, ground.Min.y);
+
+    if (overlapX <= 0f || overlapY <= 0f) return;
+
+    if (overlapX < overlapY)
     {
-        if (_playerMovement.VerticalVelocity > 0f) return;
+        ResolveHorizontalOverlap(ground, overlapX);
+        return;
+    }
+
+    if (_playerCollider.Center.y > ground.Center.y)
+    {
+        //only land if falling downward
+        if (_playerMovement.VerticalVelocity > 0.05f) return;
 
         float groundTop = ground.Max.y;
         float playerHalfHeight = _playerCollider.Size.y * 0.5f;
@@ -60,7 +74,15 @@ public class PlayerCollisionHandler : MonoBehaviour
         transform.position = currentPos;
 
         _playerMovement.SetGrounded(true);
+        return;
     }
+
+    Vector3 pos = transform.position;
+    pos.y -= overlapY;
+    transform.position = pos;
+    _playerMovement.ZeroVerticalVelocity();
+}
+
 
     private void ResolveObstacleCollision(AABBCollider obstacle)
     {
